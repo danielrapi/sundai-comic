@@ -1,15 +1,25 @@
 import { NextResponse } from 'next/server';
 
-// In a real app, you'd use a database. For now, we'll use in-memory storage
-const comicStore = new Map<string, any>();
+type ComicFrame = {
+  prompt: string;
+  caption: string;
+  imageUrl: string;
+};
+
+type ComicData = {
+  frames: ComicFrame[];
+};
+
+// Use Map with specific types
+const comicStore = new Map<string, ComicData>();
 
 export async function POST(request: Request) {
   try {
-    const comic = await request.json();
+    const comic: ComicData = await request.json();
     const id = Math.random().toString(36).substring(2, 15);
     comicStore.set(id, comic);
     return NextResponse.json({ id });
-  } catch (error) {
+  } catch (err) {
     return NextResponse.json({ error: 'Failed to store comic' }, { status: 500 });
   }
 }

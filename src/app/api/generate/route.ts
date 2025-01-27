@@ -84,7 +84,7 @@ async function generateImage(prompt: string): Promise<string> {
         stream: false
       }
     }
-  ) as unknown[];  // Type assertion here
+  ) as unknown[];
 
   const imageData = output[0];
   if (!(imageData instanceof ReadableStream)) {

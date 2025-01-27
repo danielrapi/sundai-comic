@@ -2,15 +2,14 @@
 import { useEffect } from "react";
 import { useSearchParams } from 'next/navigation';
 
-const ComicFetcher = ({ setFrames, setShowComic }: { setFrames: (frames: any) => void, setShowComic: (show: boolean) => void }) => {
+interface ComicFetcherProps {
+  setFrames: (frames: Array<{ imageUrl: string; caption: string }>) => void;
+  setShowComic: (show: boolean) => void;
+}
+
+const ComicFetcher: React.FC<ComicFetcherProps> = ({ setFrames, setShowComic }) => {
   const searchParams = useSearchParams();
   const comicId = searchParams.get('id');
-
-  useEffect(() => {
-    if (comicId) {
-      fetchComic(comicId);
-    }
-  }, [comicId]);
 
   const fetchComic = async (id: string) => {
     try {
@@ -23,6 +22,12 @@ const ComicFetcher = ({ setFrames, setShowComic }: { setFrames: (frames: any) =>
       console.error('Error fetching comic:', error);
     }
   };
+
+  useEffect(() => {
+    if (comicId) {
+      fetchComic(comicId);
+    }
+  }, [comicId]);
 
   return null; // This component does not render anything
 };

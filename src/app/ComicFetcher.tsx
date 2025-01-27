@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useSearchParams } from 'next/navigation';
 
 const ComicFetcher = ({ setFrames, setShowComic }: { setFrames: (frames: any) => void, setShowComic: (show: boolean) => void }) => {

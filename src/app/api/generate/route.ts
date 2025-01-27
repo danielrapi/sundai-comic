@@ -11,7 +11,18 @@ const openai = new OpenAI({
   baseURL: "https://models.inference.ai.azure.com"
 });
 
-async function generateFrameDescriptions(prompt: string, frameCount: number): Promise<any> {
+// Add these types at the top of the file
+type ComicFrame = {
+  prompt: string;
+  caption: string;
+  imageUrl?: string;
+};
+
+type StoryResponse = {
+  comics: ComicFrame[];
+};
+
+async function generateFrameDescriptions(prompt: string, frameCount: number): Promise<StoryResponse> {
   const response = await openai.chat.completions.create({
     model: "gpt-4o",
     response_format: { type: "json_object" },
@@ -59,10 +70,10 @@ async function generateFrameDescriptions(prompt: string, frameCount: number): Pr
   console.log(content);
   if (!content) throw new Error('Failed to generate frame descriptions');
   
-  return JSON.parse(content);
+  return JSON.parse(content) as StoryResponse;
 }
 
-async function generateImage(prompt: string) {
+async function generateImage(prompt: string): Promise<string> {
   const output = await replicate.run(
     "danielrapi/liska_model:b2d282372a92977c6917c5384be0e9cf05f9a1a1cc50844211f9a2f71aedef12",
     {
@@ -117,7 +128,7 @@ export async function POST(request: Request) {
     
     // Then, generate images for each frame
     const frames = await Promise.all(
-      storyData.comics.map(async (frame: { prompt: string, caption: string }) => {
+      storyData.comics.map(async (frame: ComicFrame) => {
         const imageUrl = await generateImage(frame.prompt);
         return {
           ...frame,

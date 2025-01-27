@@ -1,100 +1,231 @@
+'use client';
 import Image from "next/image";
+import { useState, useEffect } from "react";
+import { useSearchParams, useRouter } from 'next/navigation';
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+  const [isLoading, setIsLoading] = useState(false);
+  const [showComic, setShowComic] = useState(false);
+  const [progressStage, setProgressStage] = useState<'story' | 'frames'>('story');
+  const [progress, setProgress] = useState(0);
+  const [frames, setFrames] = useState<Array<{imageUrl: string, caption: string}>>([]);
+  
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const comicId = searchParams.get('id');
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
+  // Load comic from ID if present
+  useEffect(() => {
+    if (comicId) {
+      fetchComic(comicId);
+    }
+  }, [comicId]);
+
+  const fetchComic = async (id: string) => {
+    try {
+      const response = await fetch(`/api/comics?id=${id}`);
+      if (!response.ok) throw new Error('Failed to fetch comic');
+      const data = await response.json();
+      setFrames(data.frames);
+      setShowComic(true);
+    } catch (error) {
+      console.error('Error fetching comic:', error);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setProgress(0);
+    setProgressStage('story');
+    
+    // Faster initial progress increment (0-40%)
+    const progressInterval = setInterval(() => {
+      setProgress(prev => {
+        if (prev < 20) return prev + 0.8; // Faster initial progress
+        if (prev < 35) return prev + 0.4; // Slightly slower as we approach 40%
+        return prev;
+      });
+    }, 200); // Reduced interval time for smoother animation
+
+    const formData = new FormData(e.currentTarget);
+    const storyline = formData.get('storyline');
+    const frameCount = parseInt(formData.get('frames')?.toString() || '3');
+    
+    console.log('Submitting with frame count:', frameCount); // Debug log
+    
+    if (!storyline) {
+      console.error('Storyline is required');
+      setIsLoading(false);
+      return;
+    }
+    
+    if (frameCount < 1 || frameCount > 8) {
+      console.error('Frame count must be between 1 and 8');
+      setIsLoading(false);
+      return;
+    }
+    
+    try {
+      const response = await fetch('/api/generate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          prompt: storyline.toString(),
+          frameCount: frameCount
+        }),
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to generate image');
+      }
+      
+      clearInterval(progressInterval);
+      setProgress(40); // Set to 40% after story generation
+      setProgressStage('frames');
+      
+      const data = await response.json();
+      
+      // Store the comic and get an ID
+      const storeResponse = await fetch('/api/comics', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      });
+      
+      const { id } = await storeResponse.json();
+      
+      // Frame generation progress (40-90%)
+      const progressPerFrame = 50 / data.frames.length; // Adjusted for new range
+      
+      // Process frames and update progress
+      for (let i = 0; i < data.frames.length; i++) {
+        setProgress(40 + ((i + 1) * progressPerFrame));
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+      
+      // Final processing (90-100%)
+      setProgress(90);
+      await new Promise(resolve => setTimeout(resolve, 500));
+      setProgress(95);
+      await new Promise(resolve => setTimeout(resolve, 300));
+      setProgress(100);
+      
+      // Update URL with comic ID
+      router.push(`/?id=${id}`);
+      
+      setFrames(data.frames);
+      setShowComic(true);
+    } catch (error) {
+      console.error('Error:', error);
+    } finally {
+      clearInterval(progressInterval);
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="grid grid-rows-[auto_1fr_auto] min-h-screen p-8 pb-20 gap-8 sm:p-20 font-[family-name:var(--font-geist-sans)] relative">
+      <header className="flex justify-between items-center">
+        <h1 className="text-2xl sm:text-4xl font-bold">👩🏽 Liska Comic Maker</h1>
+      </header>
+
+      <main className="flex flex-col items-center justify-center">
+        {!isLoading && !showComic ? (
+          <form onSubmit={handleSubmit} className="w-full max-w-2xl space-y-6">
+            <div className="space-y-2">
+              <label htmlFor="storyline" className="block text-sm font-medium">
+                Your Story
+              </label>
+              <textarea
+                id="storyline"
+                name="storyline"
+                required
+                className="w-full p-3 border rounded-lg bg-background border-foreground/10 min-h-[120px]"
+                placeholder="Enter your comic storyline or topic..."
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label htmlFor="frames" className="block text-sm font-medium">
+                Number of Frames (1-8)
+              </label>
+              <input
+                type="number"
+                id="frames"
+                name="frames"
+                required
+                min="1"
+                max="8"
+                defaultValue="4"
+                className="w-full p-3 border rounded-lg bg-background border-foreground/10"
+              />
+            </div>
+
+            <button
+              type="submit"
+              className="w-full rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] h-12 px-5"
+            >
+              Create Comic
+            </button>
+          </form>
+        ) : isLoading ? (
+          <div className="w-full max-w-2xl space-y-4">
+            <div className="h-2 w-full bg-foreground/10 rounded-full overflow-hidden">
+              <div 
+                className="h-full bg-foreground transition-all duration-500"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+            <p className="text-center">
+              {progressStage === 'story' 
+                ? "Creating your story..." 
+                : "Generating comic frames..."} {Math.round(progress)}%
+            </p>
+          </div>
+        ) : (
+          <div className="w-full max-w-4xl">
+            <div className="space-y-4">
+              <button
+                onClick={() => {
+                  setShowComic(false);
+                  setFrames([]);
+                }}
+                className="mb-4 text-sm underline hover:no-underline"
+              >
+                ← Create another comic
+              </button>
+              <div className={`grid grid-cols-1 sm:grid-cols-2 gap-4 ${
+                frames.length <= 3 ? 'lg:grid-cols-3' : 
+                frames.length === 4 ? 'lg:grid-cols-2' :
+                frames.length >= 5 ? 'lg:grid-cols-3' : ''
+              } ${frames.length === 5 ? 'lg:max-w-5xl lg:mx-auto' : ''}`}>
+                {frames.map((frame, index) => (
+                  <div key={index} className="space-y-2">
+                    <div className="aspect-square relative rounded-lg overflow-hidden">
+                      <Image
+                        src={frame.imageUrl}
+                        alt={`Comic frame ${index + 1}`}
+                        fill
+                        className="object-cover"
+                      />
+                    </div>
+                    <p className="text-sm text-center">{frame.caption}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
       </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
+
+      <footer className="flex gap-6 flex-wrap items-center justify-center text-sm">
+        <p>Made with ❤️ for Liska</p>
       </footer>
     </div>
   );

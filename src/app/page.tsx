@@ -1,6 +1,6 @@
 'use client';
 import Image from "next/image";
-import { useState, useEffect, Suspense } from "react";
+import { useState, Suspense } from "react";
 import { useRouter } from 'next/navigation';
 import ComicFetcher from "./ComicFetcher"; // Import the new component
 

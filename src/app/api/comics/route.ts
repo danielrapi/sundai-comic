@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+export const maxDuration = 20;
 
 type ComicFrame = {
   prompt: string;

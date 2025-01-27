@@ -19,7 +19,7 @@ export async function POST(request: Request) {
     const id = Math.random().toString(36).substring(2, 15);
     comicStore.set(id, comic);
     return NextResponse.json({ id });
-  } catch (_err) {
+  } catch {
     return NextResponse.json({ error: 'Failed to store comic' }, { status: 500 });
   }
 }

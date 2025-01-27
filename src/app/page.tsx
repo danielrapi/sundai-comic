@@ -1,7 +1,8 @@
 'use client';
 import Image from "next/image";
 import { useState, useEffect, Suspense } from "react";
-import { useSearchParams, useRouter } from 'next/navigation';
+import { useRouter } from 'next/navigation';
+import ComicFetcher from "./ComicFetcher"; // Import the new component
 
 export default function Home() {
   const [isLoading, setIsLoading] = useState(false);
@@ -10,28 +11,7 @@ export default function Home() {
   const [progress, setProgress] = useState(0);
   const [frames, setFrames] = useState<Array<{imageUrl: string, caption: string}>>([]);
   
-  const searchParams = useSearchParams();
   const router = useRouter();
-  const comicId = searchParams.get('id');
-
-  // Load comic from ID if present
-  useEffect(() => {
-    if (comicId) {
-      fetchComic(comicId);
-    }
-  }, [comicId]);
-
-  const fetchComic = async (id: string) => {
-    try {
-      const response = await fetch(`/api/comics?id=${id}`);
-      if (!response.ok) throw new Error('Failed to fetch comic');
-      const data = await response.json();
-      setFrames(data.frames);
-      setShowComic(true);
-    } catch (error) {
-      console.error('Error fetching comic:', error);
-    }
-  };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -131,6 +111,7 @@ export default function Home() {
 
   return (
     <Suspense fallback={<div>Loading...</div>}>
+      <ComicFetcher setFrames={setFrames} setShowComic={setShowComic} />
       <div className="grid grid-rows-[auto_1fr_auto] min-h-screen p-8 pb-20 gap-8 sm:p-20 font-[family-name:var(--font-geist-sans)] relative">
         <header className="flex justify-between items-center">
           <h1 className="text-2xl sm:text-4xl font-bold">👩🏽 Liska Comic Maker</h1>
